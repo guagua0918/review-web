@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>OS</title>
+    <meta name="description" content="">
+    <meta property="og:title" content="OS">
+    <meta property="og:description" content="">
+    <meta property="og:type" content="website">
+
+    <style>
+        :root { 
+            --bg-color: #1a1a1a; 
+            --card-bg: #2d2d2d; 
+            --text-main: #e0e0e0; 
+            --text-sub: #a0a0a0; 
+            --accent: #64b5f6; 
+            --danger: #ef5350; 
+            --success: #66bb6a; 
+            --highlight-bg: #37474f; 
+            --highlight-text: #81d4fa; 
+            /* 定義上下導航的高度變數，方便計算 */
+            --header-height: 110px; 
+            --nav-height: 60px; 
+        }
+
+        * { box-sizing: border-box; user-select: none; -webkit-tap-highlight-color: transparent; }
+        
+        body { 
+            margin: 0; padding: 0; 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
+            background-color: var(--bg-color); 
+            color: var(--text-main); 
+            height: 100vh; 
+            overflow: hidden; /* 防止整個網頁捲動 */
+        }
+        
+        /* === Header (固定置頂) === */
+        .header { 
+            position: fixed; top: 0; left: 0; right: 0;
+            height: var(--header-height);
+            padding: 10px 15px; 
+            background: #252525; 
+            border-bottom: 1px solid #333; 
+            display: flex; flex-direction: column; justify-content: center; gap: 10px; 
+            z-index: 100; 
+        }
+        .header-top { display: flex; gap: 8px; justify-content: space-between; align-items: center; }
+        .filter-group { display: flex; gap: 5px; flex: 1; min-width: 0; }
+        .custom-select { background: #444; color: #fff; border: 1px solid #555; padding: 8px 4px; border-radius: 6px; font-size: 13px; outline: none; text-overflow: ellipsis; }
+        #subjectSelect { flex: 2; min-width: 80px; }
+        #modeSelect { flex: 1.5; min-width: 80px; }
+
+        .header-tools { display: flex; gap: 6px; margin-left: auto; }
+        .tool-btn { background: #444; border: none; color: #ccc; padding: 6px 10px; border-radius: 6px; font-size: 12px; cursor: pointer; }
+
+        .progress-bar-area { display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--text-sub); }
+        .progress-container { flex-grow: 1; background: #444; height: 6px; border-radius: 3px; overflow: hidden; }
+        .progress-bar { height: 100%; background: var(--success); width: 0%; transition: width 0.3s ease; }
+
+        /* === Tab Bar (固定置底) === */
+        .tab-bar { 
+            position: fixed; bottom: 0; left: 0; right: 0;
+            height: var(--nav-height); 
+            background: #1a1a1a; 
+            border-top: 1px solid #333; 
+            display: flex; justify-content: space-around; align-items: center; 
+            z-index: 100; 
+        }
+        .tab-btn { background: transparent; border: none; color: var(--text-sub); font-size: 12px; display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer; padding: 5px 20px; }
+        .tab-btn.active { color: var(--accent); }
+        .tab-icon { font-size: 20px; }
+
+        /* === View Container (鎖定在中間) === */
+        /* 這是解決遮擋的關鍵：強制留出 Header 與 Footer 的空間 */
+        .view-container { 
+            position: absolute;
+            top: var(--header-height);
+            bottom: var(--nav-height);
+            left: 0; right: 0;
+            overflow: hidden; 
+            display: none; 
+        }
+        .view-container.active { display: flex; flex-direction: column; }
+
+        /* === Flashcard Layout Fix === */
+        .flashcard-area { 
+            width: 100%; height: 100%;
+            display: flex; justify-content: center; align-items: center; 
+            padding: 15px; 
+            overflow: hidden;
+        }
+        
+        .card { 
+            background: var(--card-bg); width: 100%; max-width: 600px; height: 100%; 
+            border-radius: 16px; 
+            display: flex; flex-direction: column; /* 垂直排列內容與按鈕 */
+            overflow: hidden; /* 卡片本身不捲動 */
+            position: relative; 
+            border: 1px solid #333; 
+        }
+        
+        /* 內容區：自己捲動，並佔滿剩餘空間 */
+        .card-content { 
+            flex: 1; 
+            overflow-y: auto; 
+            padding: 25px; 
+            /* 不需要超大的 padding-bottom 了，因為按鈕不會浮在上面 */
+            padding-bottom: 20px; 
+        }
+        
+        .tag { background: #444; color: #aaa; padding: 4px 12px; border-radius: 12px; font-size: 12px; display: inline-block; margin-bottom: 15px; }
+        .term { font-size: 24px; font-weight: 700; margin-bottom: 20px; line-height: 1.4; color: #fff; }
+        .answer-section { display: block; border-top: 1px solid #444; padding-top: 20px; margin-top: 10px; }
+        .definition { font-size: 17px; line-height: 1.6; margin-bottom: 20px; color: #ddd; }
+        .exam-point-box { background: var(--highlight-bg); border-left: 4px solid var(--accent); padding: 15px; border-radius: 4px; margin-top: 15px; }
+        .exam-point-label { color: var(--accent); font-size: 12px; font-weight: bold; margin-bottom: 5px; display: block; }
+        .exam-point-text { color: var(--highlight-text); font-size: 16px; font-weight: 500; }
+        
+        /* 按鈕區：不再使用 absolute，而是 Flex item */
+        .controls { 
+            width: 100%; height: 90px; 
+            padding: 15px 20px 25px; 
+            background: var(--card-bg); /* 實色背景 */
+            border-top: 1px solid #333;
+            display: flex; gap: 15px; justify-content: center; 
+            flex-shrink: 0; /* 禁止壓縮高度 */
+            z-index: 20; 
+        }
+        
+        .btn { flex: 1; border: none; border-radius: 12px; font-size: 18px; font-weight: bold; cursor: pointer; color: #fff; height: 55px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
+        .btn:active { transform: scale(0.97); }
+        .btn-fail { background-color: var(--danger); }
+        .btn-pass { background-color: var(--success); }
+        
+        .empty-state { text-align: center; display: none; padding: 40px; }
+        .empty-state h2 { margin-bottom: 10px; }
+        .empty-state p { color: #888; margin-bottom: 30px; }
+        
+        /* === List View === */
+        .list-content { 
+            width: 100%; height: 100%;
+            overflow-y: auto; 
+            padding: 15px; 
+            padding-bottom: 20px; /* 底部留白 */
+        }
+        .section-header { background: #333; color: #fff; padding: 12px 15px; margin-bottom: 2px; border-radius: 8px 8px 0 0; cursor: pointer; display: flex; justify-content: space-between; align-items: center; font-size: 15px; font-weight: bold; }
+        .section-header.collapsed { border-radius: 8px; margin-bottom: 10px; background: #252525; color: #bbb; }
+        .section-header .arrow { transition: transform 0.3s ease; }
+        .section-header.collapsed .arrow { transform: rotate(-90deg); }
+        .section-body { margin-bottom: 20px; }
+        .list-item { background: var(--card-bg); margin-bottom: 1px; border-bottom: 1px solid #333; }
+        .list-item:last-child { border-radius: 0 0 8px 8px; }
+        .list-item-header { padding: 15px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; background: #333; }
+        .list-term { font-weight: 500; font-size: 16px; color: #eee; }
+        .list-item-body { display: block; padding: 15px; background: #222; border-top: 1px solid #333; font-size: 14px; }
+        .status-dot { width: 10px; height: 10px; border-radius: 50%; }
+        .dot-red { background: var(--danger); } .dot-green { background: var(--success); }
+        .mini-btn { padding: 6px 12px; border-radius: 6px; border: none; font-size: 13px; cursor: pointer; color: #fff; flex: 1; font-weight: 600; margin: 0 5px; }
+        .list-actions { margin-top: 15px; display: flex; justify-content: center; }
+        
+        #fileInput { display: none; }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <div class="header-top">
+            <div class="filter-group">
+                <select id="subjectSelect" class="custom-select" onchange="app.changeFilters()">
+                    <option value="ALL">全部章節</option>
+                </select>
+                <select id="modeSelect" class="custom-select" onchange="app.changeFilters()">
+                    <option value="FORGOT" selected>複習「忘忘」</option>
+                    <option value="MASTERED">複習「熟記」</option>
+                    <option value="ALL">複習「全部」</option>
+                </select>
+            </div>
+            <div class="header-tools">
+                <button class="tool-btn" onclick="app.exportData()">⬇</button>
+                <button class="tool-btn" onclick="document.getElementById('fileInput').click()">⬆</button>
+                <input type="file" id="fileInput" accept=".json" onchange="app.importData(this)">
+            </div>
+        </div>
+        <div class="progress-bar-area">
+            <div class="progress-container"><div class="progress-bar" id="progressBar"></div></div>
+            <div id="statsDisplay">0 / 0</div>
+        </div>
+    </div>
+
+    <div class="view-container active" id="view-practice">
+        <div class="flashcard-area">
+            <div class="card" id="flashcard">
+                <div class="card-content">
+                    <div class="tag" id="subject">Subject</div>
+                    <div class="term" id="term">Term</div>
+                    <div class="answer-section">
+                        <div class="definition" id="definition">Definition</div>
+                        <div class="exam-point-box">
+                            <span class="exam-point-label">EXAM POINT</span>
+                            <div class="exam-point-text" id="examPoint">Point</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="controls" id="controls">
+                    <button class="btn btn-fail" onclick="app.rate(0)">忘忘</button>
+                    <button class="btn btn-pass" onclick="app.rate(1)">熟記</button>
+                </div>
+            </div>
+            <div class="empty-state" id="emptyState">
+                <h2 id="emptyTitle">目前佇列已清空</h2>
+                <p id="emptyDesc">...</p>
+                <button class="btn btn-pass" style="width:200px; margin:0 auto;" onclick="app.resetProgress()">重置本章節進度</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="view-container" id="view-list">
+        <div class="list-content" id="listContent"></div>
+    </div>
+
+    <div class="tab-bar">
+        <button class="tab-btn active" onclick="app.switchTab('practice')"><span class="tab-icon"></span>刷題</button>
+        <button class="tab-btn" onclick="app.switchTab('list')"><span class="tab-icon"></span>清單</button>
+    </div>
+
+    <script src="data.js"></script>
+
+    <script>
+    // 檢查 data.js 是否載入成功
+    if (typeof questionData === 'undefined') {
+        alert('錯誤：找不到 data.js，請確認該檔案與 index.html 在同一資料夾內。');
+    }
+
+    class StudyApp {
+        constructor(data) {
+            this.STORAGE_KEY = 'os_review_v7_js_split';
+            this.data = data.map((item, index) => ({ ...item, id: index, status: 0 }));
+            this.queue = [];
+            this.currentCard = null;
+            this.currentSubject = 'ALL';
+            this.currentMode = 'FORGOT';
+            this.sectionState = { 0: true, 2: true };
+
+            this.loadProgress();
+            this.initSubjects();
+            this.initQueue();
+            this.renderStats();
+            this.nextCard();
+        }
+
+        initSubjects() {
+            const subjects = [...new Set(this.data.map(item => item.subject))];
+            const select = document.getElementById('subjectSelect');
+            while (select.options.length > 1) { select.remove(1); }
+            subjects.forEach(sub => {
+                const option = document.createElement('option');
+                option.value = sub;
+                option.textContent = sub;
+                select.appendChild(option);
+            });
+        }
+
+        changeFilters() {
+            this.currentSubject = document.getElementById('subjectSelect').value;
+            this.currentMode = document.getElementById('modeSelect').value;
+            this.initQueue();
+            this.nextCard();
+            this.renderStats();
+            if (document.getElementById('view-list').classList.contains('active')) {
+                this.renderList();
+            }
+        }
+
+        loadProgress() {
+            const saved = localStorage.getItem(this.STORAGE_KEY);
+            if (saved) {
+                try {
+                    const savedData = JSON.parse(saved);
+                    this.data.forEach((item, i) => {
+                        if (savedData[i]) {
+                            let s = savedData[i].status;
+                            if (s === 1) s = 0;
+                            item.status = s;
+                        }
+                    });
+                } catch(e) {}
+            }
+        }
+
+        saveProgress() {
+            const toSave = {};
+            this.data.forEach(item => { toSave[item.id] = { status: item.status }; });
+            localStorage.setItem(this.STORAGE_KEY, JSON.stringify(toSave));
+            this.renderStats();
+        }
+        
+        initQueue() {
+            let targetData = this.data;
+            if (this.currentSubject !== 'ALL') {
+                targetData = this.data.filter(d => d.subject === this.currentSubject);
+            }
+
+            if (this.currentMode === 'FORGOT') {
+                this.queue = targetData.filter(item => item.status !== 2);
+            } else if (this.currentMode === 'MASTERED') {
+                this.queue = targetData.filter(item => item.status === 2);
+            } else {
+                this.queue = [...targetData];
+            }
+            
+            for (let i = this.queue.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [this.queue[i], this.queue[j]] = [this.queue[j], this.queue[i]];
+            }
+        }
+
+        renderStats() {
+            let targetData = this.data;
+            if (this.currentSubject !== 'ALL') {
+                targetData = this.data.filter(d => d.subject === this.currentSubject);
+            }
+            const total = targetData.length;
+            const mastered = targetData.filter(i => i.status === 2).length;
+            document.getElementById('statsDisplay').textContent = `${mastered} / ${total} (熟記)`;
+            const pct = total === 0 ? 0 : Math.round((mastered / total) * 100);
+            document.getElementById('progressBar').style.width = `${pct}%`;
+        }
+
+        nextCard() {
+            const flashcard = document.getElementById('flashcard');
+            const emptyState = document.getElementById('emptyState');
+            const emptyTitle = document.getElementById('emptyTitle');
+            const emptyDesc = document.getElementById('emptyDesc');
+
+            if (this.queue.length === 0) {
+                flashcard.style.display = 'none';
+                emptyState.style.display = 'block';
+                
+                if (this.currentMode === 'FORGOT') {
+                    emptyTitle.textContent = "沒有「未熟」的題目了";
+                    emptyDesc.textContent = "you可以切換到「熟記模式」複習，或是重置進度。";
+                } else if (this.currentMode === 'MASTERED') {
+                    emptyTitle.textContent = "熟記題目複習完畢";
+                    emptyDesc.textContent = "再刷一次請切換模式重整佇列。";
+                } else {
+                    emptyTitle.textContent = "所有題目已完成";
+                    emptyDesc.textContent = "休息一下吧";
+                }
+                return;
+            }
+
+            flashcard.style.display = 'flex';
+            emptyState.style.display = 'none';
+            this.currentCard = this.queue.shift();
+            this.renderCard();
+        }
+
+        renderCard() {
+            const c = this.currentCard;
+            document.getElementById('subject').textContent = c.subject;
+            document.getElementById('term').textContent = c.term;
+            document.getElementById('definition').textContent = c.definition;
+            document.getElementById('examPoint').textContent = c.exam_point;
+        }
+
+        rate(score) {
+            if (score === 1) { 
+                this.currentCard.status = 2;
+            } else {
+                this.currentCard.status = 0;
+                const minInsert = Math.min(3, this.queue.length);
+                const maxInsert = Math.min(10, this.queue.length);
+                const idx = Math.floor(Math.random() * (maxInsert - minInsert + 1)) + minInsert;
+                this.queue.splice(idx, 0, this.currentCard);
+            }
+            this.saveProgress();
+            this.nextCard();
+        }
+
+        resetProgress() {
+            let msg = `確定重置「${this.currentSubject === 'ALL' ? '全部' : this.currentSubject}」的進度為「忘了」？`;
+            if(confirm(msg)) { 
+                this.data.forEach(item => {
+                    if (this.currentSubject === 'ALL' || item.subject === this.currentSubject) {
+                        item.status = 0;
+                    }
+                });
+                this.saveProgress();
+                this.changeFilters();
+            }
+        }
+
+        switchTab(tab) {
+            document.querySelectorAll('.view-container').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+            if (tab === 'practice') {
+                document.getElementById('view-practice').classList.add('active');
+                document.querySelectorAll('.tab-btn')[0].classList.add('active');
+                if (this.queue.length === 0) this.initQueue();
+                if (this.queue.length > 0 || this.currentCard) this.nextCard();
+            } else {
+                document.getElementById('view-list').classList.add('active');
+                document.querySelectorAll('.tab-btn')[1].classList.add('active');
+                this.renderList();
+            }
+        }
+
+        toggleSection(status) {
+            this.sectionState[status] = !this.sectionState[status];
+            this.renderList();
+        }
+
+        renderList() {
+            const list = document.getElementById('listContent');
+            list.innerHTML = '';
+            
+            let targetData = this.data;
+            if (this.currentSubject !== 'ALL') {
+                targetData = this.data.filter(d => d.subject === this.currentSubject);
+            }
+
+            const groups = {
+                0: { title: '忘忘', items: [], class: 'dot-red', color: '#ef5350' },
+                2: { title: '熟記', items: [], class: 'dot-green', color: '#66bb6a' }
+            };
+
+            targetData.forEach(item => { 
+                const s = item.status === 2 ? 2 : 0;
+                groups[s].items.push(item); 
+            });
+
+            [0, 2].forEach(status => {
+                const g = groups[status];
+                const isOpen = this.sectionState[status];
+                const html = `
+                    <div class="section-header ${isOpen ? '' : 'collapsed'}" onclick="app.toggleSection(${status})" style="border-left: 5px solid ${g.color}; margin-top: 10px;">
+                        <span>${g.title} - ${g.items.length} 題</span><span class="arrow">▼</span>
+                    </div>`;
+                list.insertAdjacentHTML('beforeend', html);
+
+                if (isOpen && g.items.length > 0) {
+                    const body = document.createElement('div');
+                    body.className = 'section-body';
+                    g.items.forEach(item => {
+                        const el = document.createElement('div');
+                        el.className = 'list-item'; 
+                        el.innerHTML = `
+                            <div class="list-item-header">
+                                <div class="list-term">${item.term}</div>
+                                <div class="status-dot ${g.class}"></div>
+                            </div>
+                            <div class="list-item-body">
+                                <p style="color:#888;font-size:12px;margin-bottom:5px;">${item.subject}</p>
+                                <p style="margin-bottom:10px;color:#ccc;line-height:1.6;">${item.definition}</p>
+                                <div style="background:#37474f; padding:10px; border-radius:4px; color:#81d4fa; margin-bottom:15px;">
+                                    <strong>考點：</strong>${item.exam_point}
+                                </div>
+                                <div class="list-actions">
+                                    <button class="mini-btn btn-fail" onclick="app.manualUpdate(${item.id}, 0)">忘了</button>
+                                    <button class="mini-btn btn-pass" onclick="app.manualUpdate(${item.id}, 2)">熟記</button>
+                                </div>
+                            </div>`;
+                        body.appendChild(el);
+                    });
+                    list.appendChild(body);
+                }
+            });
+        }
+
+        manualUpdate(id, s) {
+            const item = this.data.find(d => d.id === id);
+            if (item) {
+                item.status = s;
+                this.saveProgress();
+                this.renderList();
+                this.initQueue();
+            }
+        }
+
+        exportData() {
+            const dataStr = JSON.stringify(localStorage.getItem(this.STORAGE_KEY));
+            const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+            const linkElement = document.createElement('a');
+            linkElement.setAttribute('href', dataUri);
+            linkElement.setAttribute('download', `os_review_backup_${new Date().toISOString().slice(0,10)}.json`);
+            linkElement.click();
+        }
+
+        importData(input) {
+            const file = input.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const content = JSON.parse(e.target.result);
+                    const actualData = JSON.parse(content); 
+                    localStorage.setItem(this.STORAGE_KEY, JSON.stringify(actualData));
+                    alert('匯入成功！');
+                    location.reload();
+                } catch (err) { alert('匯入失敗'); }
+            };
+            reader.readAsText(file);
+        }
+    }
+
+    // 啟動 App (讀取 data.js 中的變數)
+    if (typeof questionData !== 'undefined') {
+        window.app = new StudyApp(questionData);
+    } else {
+        // 如果使用者沒下載 data.js，也可以直接在下方 fallback
+        alert('請確認 data.js 已正確載入');
+    }
+    </script>
+</body>
+</html>
